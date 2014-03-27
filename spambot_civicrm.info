@@ -1,0 +1,9 @@
+name = Spambot CiviCRM
+description = Add-on for Drupal spambot module to delete associated CiviCRM contact when spambot deletes a user account.
+version = 6.x-1.0
+core = 6.x
+package = Spam control
+php = 5.3
+
+dependencies[] = civicrm
+dependencies[] = spambot
