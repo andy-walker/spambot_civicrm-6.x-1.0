@@ -1,0 +1,81 @@
+<?php
+
+/**
+ * Spambot CiviCRM - hook into user_delete, so that the corresponding Civi contact is
+ * deleted whenever spambot deletes a user
+ * andyw@circle, 27/03/2014
+ */
+
+/**
+ * Implementation of hook_user
+ */
+function spambot_civicrm_user($op, &$edit, $account) {
+    
+    if ($op != 'delete')
+        return;
+
+    # check if spambot_cron exists in the call stack - we only want to delete the
+    # Civi contact if it's spambot that is deleting the user
+    $via_spambot = false;
+    foreach (debug_backtrace() as $backtrace_item) {
+        if (isset($backtrace_item['function']) and $backtrace_item['function'] == 'spambot_cron') {
+            $via_spambot = true;
+            break;
+        }
+    }
+
+    if ($via_spambot) {
+
+        civicrm_initialize();
+        
+        # attempt to find associated contact id for the user
+        $result = civicrm_api('UFMatch', 'getsingle', $params = array(
+            'version' => 3,
+            'uf_id'   => $account->uid
+        ));
+
+        # no match ..
+        if (!isset($result['contact_id']))
+            return watchdog(
+                'spambot_civicrm', 
+                t('Could not find matching contact record for uid @uid when deleting user via spambot', array(
+                    '@uid' => $account->uid
+                )),
+                array(),
+                WATCHDOG_ERROR
+            );           
+
+        # some other kind of error ..
+        if ($result['is_error'])
+            return watchdog(
+                'spambot_civicrm', 
+                t('An error occurred finding UFMatch for uid @uid: @message', array(
+                    '@uid'     => $account->uid,
+                    '@message' => $result['error_message']
+                )),
+                array(),
+                WATCHDOG_ERROR
+            );
+
+        # move contact record to trash
+        $delete_result = civicrm_api('contact', 'delete', array(
+            'version' => 3,
+            'id'      => $result['contact_id']
+        ));
+
+        # check for errors
+        if ($delete_result['is_error'])
+            return watchdog(
+                'spambot_civicrm', 
+                t('An error occurred contact record to trash for contact id @contact_id: @message', array(
+                    '@contact_id' => $result['contact_id'],
+                    '@message'    => $delete_result['error_message']
+                )),
+                array(),
+                WATCHDOG_ERROR
+            );
+
+
+    }
+
+}
