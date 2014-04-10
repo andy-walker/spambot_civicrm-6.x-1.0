@@ -41,11 +41,8 @@ function drush_spambot_civicrm($command) {
             $uf_matches = array();
 
             # get all uids from Drupal
-            $results = db_select('users', 'u')
-                ->fields('u', array('uid'))
-                ->execute();
-        
-            foreach ($results as $result)
+            $results = db_query("SELECT uid FROM users");     
+            while ($result = db_fetch_object($result))
                 $uids[] = $result->uid;
 
             # get all uf_ids from Civi
